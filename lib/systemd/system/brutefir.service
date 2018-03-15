@@ -1,0 +1,19 @@
+[Unit] 
+Description=BruteFIR
+After=multi-user.target
+ 
+[Service]
+Type=forking
+ExecStart=/usr/bin/brutefir -nodefault -daemon /etc/brutefir_config 
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=brutefir
+Restart=always
+RestartSec=2
+User=root
+Group=root
+LimitRTPRIO=99
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target
