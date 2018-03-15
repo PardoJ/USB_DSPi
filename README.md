@@ -2,10 +2,10 @@
 A raspberry DSP and audiophile player dedicated to usb external sound cards.
 
 Based on:
-  - Brutefir
-  - mpd
-  - alsa
-  - raspbian
+  * Brutefir
+  * mpd
+  * alsa
+  * raspbian
   
 ## Raspbian installation
 DL
@@ -18,12 +18,15 @@ SSH connection
  
 ## System preparation
 ### Update
+```
 sudo apt-get clean all
 sudo apt-get update
 sudo apt-get upgrade
 sudo apt-get upgrade raspberrypi-sys-mods
 sudo apt-get dist-upgrade 
+```
 ### Configuration
+```
 rpi-update
 raspi-config
    expand FS
@@ -31,8 +34,9 @@ raspi-config
 	 language
 	 user password
  sudo reboot
- 
+ ```
 ## Services installation
+```
 sudo apt-get install mpd brutefir
 
 mkdir /home/pi/music
@@ -52,8 +56,9 @@ systemctl enable mpd
 sudo service mpd restart
 systemctl enable brutefir.service
 service brutefir start
-
+```
 ## System tweaks
+```
 for i in `pgrep ksoftirqd`; do chrt -p 99 $i; done
 cp /etc/rc.local /etc/rc.local.old
 echo "Patching /etc/rc.local - original file copied to /etc/rc.local.old"
@@ -64,7 +69,7 @@ sysctl -w vm.swappiness=1
 cp /etc/sysctl.conf /etc/sysctl.conf.old
 echo "Patching /etc/sysctl.conf - original file copied to /etc/sysctl.conf.old"
 echo -e "\nvm.swappiness=1" >> /etc/sysctl.conf
-
+```
 ## Alsa tweaks
 
 ## Real time kernel patch
