@@ -1,0 +1,488 @@
+############################## 
+## DEFAULT GENERAL SETTINGS ## 
+##############################
+
+float_bits: 32;             				# <NUMBER: internal floating point resolution, either 32 or 64>;
+
+sampling_rate: 44100;       				# <NUMBER: sampling rate in Hz of audio interfaces>;
+
+filter_length: 65536,8;       				# <NUMBER: length in samples of the (sub)filters>[,<NUMBER: number of subfilters per filter>];
+	# The filter_length setting specifies how long the filters should be. This can be done in two ways. Either by
+	# specifying the length in one number, which must be a power of two. If so, the convolution will be done on the whole
+	# filter length. To partition a 65536 tap filter in 16 parts, you write filter_length: 4096,16. Partitioned filters
+	# can be used to improve performance and reduce I/O-delay.
+
+config_file: "~/.brutefir_config"; 			# <STRING: default location of main configuration file>;
+
+overflow_warnings: true;    				# <BOOLEAN: echo overflow warnings to stderr>;
+	# Note that overflowed samples are always set to the maximum output value of the output device, so there is no actual
+	# overflow on the output unless the actual floating point value is overflowed). If overflow occurs, it means that the
+	# filter is amplifying too much, either through its coefficients or through input and output attenuation.  Overflow is
+	# not checked for if the output values are floating point. 
+	
+show_progress: true;        				# <BOOLEAN: echo progress to stderr>;
+
+monitor_rate: false;        				# <BOOLEAN: monitor sample rate, and abort if it changes>;
+
+max_dither_table_size: 0;   				# <NUMBER: maximum size in bytes of pre-calculated dither>;
+	# If dither is applied to any output, a dither table will be calculated when the program is started. It contains
+	# uncorrelated random values that is used to generate the dither. The more channels that applies dither, the larger
+	# table is needed, if to keep the dither uncorrelated between channels. This table can get quite large memory-wise.
+	# If you want to limit its size, set max_dither_table_size to a value. It should rather not be less than one megabyte
+	# though. If it is set to zero or negative, the program will itself choose a size. 
+	
+allow_poll_mode: false;     				# <BOOLEAN: allow input poll mode>;
+	# If a sound card which is used for input cannot be configured to have a period size (interrupt interval) equal to or
+	# smaller than the configured filter (partition) length, or if it is cannot be a power of two, BruteFIR must be run in
+	# input poll mode. This means that the sound card is polled for data, and sound card interrupts are not used.
+	# BruteFIR will run just as reliably (as long as the sound card allows for small transfers) but will consume more of
+	# the spare processor time. Thus it will look like BruteFIR uses more processor than it actually needs to. If more 
+	# processor time is used for filtering, less will be used for polling, thus input poll mode does not mean that it is
+	# not possible to have as long filters as running in normal mode. However, for some applications (for example when the
+	# spare processor time is used by another vital program), input poll mode is not suitable, and by setting the
+	# allow_poll_mode to false, BruteFIR will exit with an error if input poll mode is required. 
+	
+modules_path: ".";          				# <STRING: extra path where to find BruteFIR modules>;
+
+logic: 										# <STRING: logic module name> { <logic module parameters> }[, 
+	# See logic modules section
+
+powersave: true;           					# <BOOLEAN or NUMBER: pause filtering when input is zero. Or hit a seuil (-80; for -80dB>;
+
+lock_memory: true;          				# <BOOLEAN: try to lock memory if realtime prio is set>;
+	# If there is any sound card used for input or output (or any other sample-clock dependent device), BruteFIR will
+	# automatically set its delay-sensitive processes to realtime priority, thus you will typically need to run the
+	# program as root. To maintain realtime performance, it is important that there is no memory belonging to the program
+	# in the swapfile, thus all memory must be locked to RAM. This is done if lock_memory is set to true.  Note that the
+	# memory is never locked when realtime priority is not set (that is when there are only files used for input and
+	# output). 
+	# Warning: there seems to be a bug in the Linux kernel which makes the shared memory to be locked one time for each
+	# process, meaning that when lock_memory is set to true, BruteFIR will seem to consume a lot more memory than it
+	# should.  Also, it makes of course no sense to lock memory if your system does not have a swap activated.  Due to
+	# this issue, the best thing to do is to have a system with no swap and avoid locking the memory. 
+	
+sdf_length: -1;             				# <NUMBER: sub-sample delay filter half length in samples>[, <NUMBER: kaiser window beta>];
+	# If subsample delays should be possible to set, the sdf_length setting must be larger than zero.  It specifies the
+	# half length of a sub-sample delay filter. A sub-sample delay filter is simply a sinc sampled with a sub-sample
+	# offset.  Thus, when a signal is convolved with the filter it is delayed with the corresponding offset.  Since a sinc
+	# signal is infinitely long, it must be windowed. A kaiser window is used, default beta is 9.0, but an own value can
+	# be specified by adding it after a comma (example: sdf_length: 31, 8.5;), there is little reason to use other than
+	# the default though. 
+	# The distortion caused by the windowing is a soft rolloff at higher frequencies, the shape depends on the beta value.
+	# There is no phase distortion. Since the sub-sample filters are linear phase, they will add a pre-response (in
+	# practice I/O-delay), which is their half filter length, that is the value given after the sdf_length setting.  If
+	# sub-sample delay are used only on inputs or outputs, the added pre-response is the same as the sdf_length, if used
+	# on both (usually not necessary), it will be twice the length. To activate sub-sample delay, also a valid subdelay
+	# must be specified in at least one of the input/output structures. 
+	# The valid range is -99 to 99.
+	#
+	# The advantage of a long sub-sample filter length is that the rolloff in the high frequencies starts later and gets
+	# sharper, that is less high frequency information is lost. The disadvantage of long sub-sample filters is that the
+	# required CPU time increases, and the added I/O-delay increases. Sub-sample filters are processed separately in the
+	# frequency domain using FFT, and therefore it is recommended to keep sdf_length at a power of two minus one (the
+	# actual filter length is twice sdf_length plus one), 
+	# which means that as much as possible of the FFT block is used (an sdf_length of 16 requires as much CPU time as an
+	# sdf_length of 31, since the same block length is required). With an sdf_length of 31 and the default beta of 9.0,
+	# and a sample rate of 44100 Hz, the response is flat up to 19 kHz, and then a soft rolloff begins which reaches -0.20
+	# dB at 20 kHz, which is good enough for most needs.  The next natural step, 63, keeps a flat response up to about
+	# 20500 Hz, with -0.20 dB at 21 kHz. 
+	
+convolver_config: "~/.brutefir_convolver"; 	# <STRING: file of convolver config file to store FFTW wisdom in>;
+
+benchmark: 									# <BOOLEAN: start in benchmark mode (can only be used in main config file)>;
+
+safety_limit: 								# <NUMBER: if non-zero max dB in output before aborting>;
+	# The purpose of the safety_limit setting is to protect your ears and expensive speakers, it's active if set to a
+	# non-zero value.  Every output sample is checked and if it exceeds this value (in dB) BruteFIR will immediately exit
+	# with an error message, before any sound is sent to the output. 
+
+#################### 
+## COEFF DEFAULTS ## 
+####################
+
+coeff "name" { 
+	filename:								# <STRING: filename>; | <NUMBER: shmid>/<NUMBER: offset>/<NUMBER: blocks>[,...];
+		# Instead of a filename, comma-separated number groups can be given.  The first number will be a shared memory ID
+		# (man shmat) where the data is found, the second number is the offset in bytes into the shared memory area where
+		# the program starts to read, and the third is how many blocks that should be read.  A block is a filter segment,
+		# that is if filter_length is 4096, 16 one block is 4096 coefficients, and there can be no more than 16 blocks per
+		# coefficient set. If not all blocks covered in the first group, 
+		# there must be following number groups to provide the full length. When a shared memory segment is given, it is
+		# required that the format is "processed".
+		#
+		# In some cases, when one wants to test the performance of a certain BruteFIR configuration, but don't feel like
+		# generating coefficients, one can set the filename to "dirac pulse".  Then BruteFIR will generate a dirac pulse
+		# filter internally and use it as any other filter, and thus will cost as much in processing as any other filter of
+		# the same length. However, if you need a dirac pulse in the real case, it makes no sense using this feature, since
+		# simply setting the coeff field in the filter structure to -1 gives the same effect and uses very little processor
+		# power (and memory). 
+		
+	format: "text";     					# <STRING: file sample format string | "text" | "processed">;
+		# "text" coefficients are listed in a text file, one coefficient per line. They are parsed with the standard C
+		# library strtod function.  A sample format string describing a raw format, for example 16 bit little endian
+		# integer. The format of this string is described in the Input and output structure section.  "processed"
+		# coefficients are stored in the format BruteFIR uses internally. Attenuation or adapted length cannot be applied if
+		# this format is used. 
+		
+	attenuation: 0.0;   					# <NUMBER: attenuation in dB>;
+		# The coefficients can be scaled, by setting the attenuation to non-zero. 
+		
+	blocks: -1;         					# <NUMBER: length in blocks>;
+		# The blocks field says how long in filter blocks the coefficient set should be. If it is set to -1, the full length
+		# is assumed.  Note that custom lengths are only possible if partitioned convolution is employed (quite naturally,
+		# since else there will only be one filter block covering the full length).
+	
+	skip: 0;            					# <NUMBER: bytes to skip in beginning of file>;
+		# The skip field if given specifies how many bytes in the beginning of the file that should be skipped.  This can be
+		# used to skip headers in a file or similar. The field will be ignored if the coefficients are not read from file.
+		
+	shared_mem: false;  					# <BOOLEAN: allocated in shared memory>
+		# The shared_mem field indicates if the coefficient should be stored in shared memory. Some modules may require
+		# that, such as the equalization module. 
+};
+
+#################### 
+## INPUT DEFAULTS ## 
+####################
+
+# All fields for the input and output structures except mapping, delay and mute must be set in the default configuration
+# file.
+
+input "name" {	
+	device: "file" {};					# module and parameters to get audio				<STRING: I/O module name> { <I/O module settings> };		
+		# The device field specifies the source/destination of the digital audio. This is always an I/O module. First the
+		# name of the module is stated, followed by a its configuration within {}. If the audio is read/written from/to a
+		# module which does not continue forever (for example reading from a file), BruteFIR will finish when the first I/O
+		# module comes to an end (hopefully an input module, write failure of an output module is considered an error). 
+		
+	sample: "S16_LE";   					# sample format										<STRING: sample format>;
+		# The sample format should be one of the following strings: 
+			# "S8", signed 8 bit integer.
+			# "S16_LE", signed 16 bit little endian integer.
+			# "S16_BE", signed 16 bit big endian integer.
+			# "S16_4LE", signed 16 bit little endian integer, stored in the high bits of 4 bytes.
+			# "S16_4BE", signed 16 bit big endian integer, stored in the high bits of 4 bytes.
+			# "S24_LE", signed 24 bit little endian integer.
+			# "S24_BE", signed 24 bit big endian integer.
+			# "S24_4LE", signed 24 bit little endian integer, stored in the high bits of 4 bytes.
+			# "S24_4BE", signed 24 bit big endian integer, stored in the high bits of 4 bytes.
+			# "S32_LE", signed 32 bit little endian integer.
+			# "S32_BE", signed 32 bit big endian integer.
+			# "FLOAT_LE", 32 bit little endian floating point.
+			# "FLOAT_BE", 32 bit big endian floating point.
+			# "FLOAT64_LE", 64 bit little endian floating point.
+			# "FLOAT64_BE", 64 bit big endian floating point.
+			# "<X>_NE", native endian, <X> is replaced with S16, S16_4 etc, and the format will be converted to the LE or BE counterpart depending on 
+			# if the machine is little endian or big endian.
+			# "AUTO", will be converted to one of the LE or BE formats (or S8), as decided by the associated I/O module. 
+		# The common format 16 bit signed little endian found in for example 16 bit wav-files is thus "S16_LE".  The floating 
+		# point formats can be in any range, however all integer formats will be scaled to -1.0 to +1.0 internally, 
+		# so if to match an integer format, the range should be -1.0 to +1.0. There is no overflow checking for floating
+		# point formats (that is values larger than +1.0 or lesser than -1.0 is not truncated). 
+
+	channels: 2/0,1;    					# number of open channels / which to use			<NUMBER: open channels>[/<NUMBER: channel index>[, ...]];
+		# The channels field specifies the number of open and used channels of the device. If the number of open channels
+		# exceed the number of used channels, a slash (/) followed by a comma-separated list of channel indexes of used
+		# channels must be appended. If we for example have a eight channel ADAT sound card, but we only want to use the
+		# first two, we write 8/0,1 as the channels setting. As you see, the lowest channel index is zero, not one. 
+		
+	mapping: 								#													<NUMBER: channel index>[, ...];
+		#  The length of the list of names (given after the structure type name) must match or exceed the number of used
+		#  channels.  If there are more channels in the head (the logical, or virtual channels) than there are available
+		#  through the device, the specified channels must be mapped onto the physical device channels. This is done with
+		#  the mapping field, which simply is a list of indexes, which index in the head to map to which physical device
+		#  channel. Here a simplified example:
+			# output 14,15,16 {
+			# 		...
+			# 		channels: 8/5,4;
+			# 	mapping: 0,1,0;
+			# };
+		  
+		# In this example, two channels from the eight channel
+		# device are used, channels with index 5 and 4. The order of the channel indexes matter, physical channel 5 will
+		# now be considered the first (index 0) of the available physical channels, and 4 the second (index 1). The
+		# mapping fields tells how to map the channels called 14, 15 and 16 in the header to those two physical channels.
+		# The mapping is in the same order as the channels in the header, that is 14 is mapped to physical channel index 0
+		# (which is channel 5 on  the eight channel device), 15 to index 1 (channel 4 on the device), and 16 to index 0, 
+		# that is the logical channels 14 and 16 will mix into the same output on the device. In the standard case, where 
+		# logical channels are the same as the amount of channels made available through the channels field, a mapping 
+		# specification is not needed. Then the first logical channel is mapped to the first listed device channel and so on		
+		
+	delay: 0,0;         					# delay in samples for each channel					<NUMBER: delay in samples>[, ...]; 
+	subdelay:								#													<NUMBER: additional delay in 1/100th samples (valid range -99 - 99)>[, ...]; 
+	maxdelay: -1;							# max delay for variable delays						<NUMBER: maximum delay for dynamic changes>; 
+	individual_maxdelay:					# 													<NUMBER: maximum delay for dynamic changes>[, ...];;
+		# The list of delays specifies how many samples a channel should be delayed. This could be used to compensate for
+		# speaker positions that is either to close or too far away. It could also be used to compensate for acasual
+		# filters. Delay can be changed in runtime, if maxdelay is not set to a negative value.  It defines the upper bound
+		# of delay in samples. When the program is started, delay buffers for all channels to match maxdelay is allocated.
+		# If it is negative, only the precise amount specified by the delay array is allocated.
+		# The setting individual_maxdelay was added later, and works the same as maxdelay with the difference that it is
+		# specified per channel.  It is useful to save memory when there are many channels, and only some of them need
+		# dynamic delay (or considerably larger buffer than the others). 
+
+		# If the general setting sdf_length is larger than zero, the subdelay setting will take effect. It specifies the
+		# sub-sample delay per channel in 1/100th of samples (valid range is -99 to 99). This delay can be changed in
+		# runtime. To disable sub-sample delay on a channel, set its sub-delay to a negative value outside the valid range.
+		# Since sub-sample delay consumes CPU time, it is recommended to only activate it where necessary.  Sub-delay
+		# filters adds pre-response, and therefore all channels with sub-delay disabled will be automatically compensated
+		# with an I/O delay to make them aligned. 
+	
+	mute: false, false; 					# mute active on startup for each channel			<BOOLEAN: mute channel>[, ...];
+		# The mute list of booleans, specifies, in order, which channels that should be muted from the beginning. The muted
+		# channels can later be unmuted from the CLI. 
+};
+
+##################### 
+## OUTPUT DEFAULTS ## 
+#####################
+
+	device: "file" {};  			# See upper §		
+	sample: "S16_LE";     			# See upper §			
+	channels: 2/0,1;     			# See upper § 
+	delay: 0,0;      				# See upper §     
+	subdelay: 	  					# See upper §															
+	maxdelay: -1;	   				# See upper §   
+	individual_maxdelay: 	  		# See upper §			
+	mute: false, false;   			# See upper §
+	mapping: 	  					# See upper §			
+	
+	dither: false;      					# apply dither										<BOOLEAN: apply dither>;
+		# If the dither flag is set to true, dither is applied on all used channels. Dither is a method to add carefully
+		# devised noise to improve the resolution. Although most modern recordings contain dither, they need to be
+		# re-dithered after they have been filtered for best resolution. Dither should be applied when the resolution is
+		# reduced, for example from 24 bits on the input to 16 bits on the output. However, one can claim that dither should
+		# always be applied, since the internal resolution 
+		# is always higher than the output. When BruteFIR is compiled with single precision, it is not possible to apply
+		# dither to 24 bit output, since the internal resolution is not high enough. BruteFIR's dither algorithm is the
+		# highly efficient HP TPDF dither algorithm (High Pass Triangular Probability Distribution Function). 
+	
+	merge: false;       					# merge discontinuities at coeff change				<BOOLEAN: merge discontinuities at coeff change>;
+		# If the merge flag is set to true, discontinuities that may occur when coefficients are changed in runtime, is
+		# smoothed out with a simple merge algorithm. This avoids "clicks" that may occur in the sound when coefficients are
+		# changed. Note that discontinuities occurs also when volume is changed, but that is not merged, since those
+		# discontinuities are generally not audible or masked by the volume change itself. If someone does not agree with
+		# that, let me know, and I will make it apply the merger at volume changes too.  
+};
+
+##################### 
+## FILTER DEFAULTS ## 
+#####################
+
+# Only the process field should be given in the default configuration file. 
+ 
+filter "name" { 
+	from_inputs: 		#													<STRING: name | NUMBER: index>[/<NUMBER:attenuation in dB>][/<NUMBER:multiplier>][, ...]; 
+	from_filters: 		#													<same syntax as from_inputs field>;
+		# The from_inputs, from_filters and to_outputs fields have the same syntax. One channel/filter is given as the
+		# string name or index number, and if attenuation should be applied, it is followed by a slash (/) and attenuation
+		# in dB. Instead of, or combined with, attenuation in dB, a multiplier can be given, a number which all samples
+		# will be multiplied with.  The writing "channel 1"/6/-1 means that channel 1 is attenuated 6 dB and the polarity
+		# is changed (multiplication with -1). 
+		# It is also possible to write "channel 1"//-0.5 which is equivalent to the first example.  If more than one channel
+		# should be included, they are separated with commas.  The to_filters field has the same syntax with the exception
+		# that attenuation is not allowed. 
+
+	to_outputs: 		#													<same syntax as from_inputs field>; 
+	to_filters: 		# 													<STRING: name | NUMBER: index>[, ...];
+		# If an output channel exists in several filter structures, the filter outputs will be mixed into that channel. 
+		# Thus, a set of filter structures defines how inputs and outputs should be copied, mixed and filtered.
+		# With help of the from_filters and to_filters fields, filters can be connected to each-other. The only real 
+		# constraint is that there must be no loops. BruteFIR will detect and point out errors if such exist in a given filter network. 
+		# Note that if possible coefficients should be pre-convolved rather than put as filters in series, since a 2N length
+		# filter  computes much faster than two cascaded N length filters. 
+
+	process: 			# process index to run in (-1 means auto)			<NUMBER: process index>;
+		# The process field specifies in which Unix process the filter should be run. All filters with the same process
+		# index will run in the same process. Process index 0 must exist, and if there are more processes they should be in
+		# series, 0, 1, 2, 3 and so on.  This field is important if BruteFIR runs on a multi-processor machine. The optimal
+		# situation is that there is one process per processor, and that each process requires the same processor time.
+		# Then you will get most out of your multi-processor computer. There is one limitation 
+		# of how filters can be distributed between processes: mixing to an output channel or a filter input must be done
+		# within the same process.  If the process field is set to -1, an automatic but naive load balancing will take
+		# place, which may or may not be as good as a hand-made load balancing. 
+	
+	coeff: 				# 													<STRING: name | NUMBER: index>;
+		# The coeff field defines which coefficient set that should be used for the filter. It could be given as the string
+		# name of the set, or as its index number. If the index number is set to minus one (-1), there will be no filtering
+		# in the filter, it will just mix and copy inputs/outputs as specified. Note that the length of the coefficient set
+		# specifies how processor intensive the filter will be. 
+	
+	delay: 				# predelay, in blocks								<NUMBER: pre-delay in blocks>;
+		# The delay field specifies how many filter blocks pre-delay there should be. Zero or negative means no delay.  The
+		# maximum allowed delay is one block less than full length. Thus, with unpartitioned filtering there can be no delay
+		# at all.  The delay cost is zero both in terms of memory and processing. 
+		
+	crossfade: 			# crossfade when coefficient is changed				<BOOLEAN: cross-fade when coefficient is changed>;
+		# If the crossfade setting is set to true, there will be a cross-fade when the coefficient is changed in runtime,
+		# making the coefficient change totally seamless. This means that when changing coefficient (using the CLI for
+		# example), the filter will convolve one block with the old coefficient, fade out that and mix it with a fade in
+		# block with the new coefficient.  This means that at the time of coefficient change, there will be roughly twice
+		# the amount of processing for that filter. 
+		# This processing spike can of course cause buffer underflow if running with a sound card and heavy CPU load in the
+		# normal case.  If there for example are 10 filters in a configuration (all with crossfade active), and all
+		# coefficients are changed at the same time, the normal CPU load should not exceed 50%, since the spike will roughly
+		# require twice the load. However, if the coefficients are changed only one filter at a time, only 10% extra
+		# processing is required compared to the normal case in the example.  
+};
+
+#################### 
+##  LOGIC MODULE  ## 
+####################
+
+# Command line interface (cli)
+##############################
+
+# The CLI logic module (named "cli") provides a command line interface available through telnet, a local socket, a pipe,
+# or a serial line. The CLI is used for changing settings in runtime, which is of course only suitable when BruteFIR is
+# used in realtime. It can be used interactively by hand, for example by connecting to it through telnet. It is also
+# suitable for scripting BruteFIR, or using it as a means of inter-process communication if BruteFIR is used as the
+# convolution engine for another program.  The context sensitive port field specifies which interface will be used as follows: 
+
+	# port: <INTEGER: TCP port number>; the CLI will listen on the given port number for incoming telnet clients.
+	# port: <STRING: "/dev/" ...>; when the string starts with "/dev/" the CLI assumes a serial device (such as "/dev/ttyS0"
+		# on Linux) is pointed out, and opens it as a serial port, with the default line speed 9600 baud, if not the line_speed
+		# field is used specifying another speed.  
+	# port: <STRING: name of local socket>; any other string not starting with
+		# "/dev/" is handled as the file name for a local socket, and the CLI will create and listen for incoming connections on
+		# the given path. If the path exists, it will be replaced.  
+	# port: <INTEGER: read end file descriptor>, <INTEGER: write end file descriptor>; 
+	
+# the CLI will assume that the given file descriptors are already opened and ready for use, and
+# will attach the read end to CLI input, and the write end to CLI output. This interface is suitable as inter-process
+# communication when BruteFIR is integrated into another program, and is started through fork() and exec().  The CLI
+# does not have much terminal functionality to speak of, and is thus a bit cumbersome to use interactively. It reads a
+# whole line at a time, and can interpret backspace, but that is about it. There is no echo functionality so the
+# connecting client needs to handle that (telnet does, and terminal software for serial lines usually have a function to
+# enable local echo).  Instead of specifying a port, one can specify a string of commands, which will be run in a loop
+# as a script. Example: "cli" { script: "cfc 0 0;; sleep 10;; cfc 0 1;; sleep 10"; }. The script may span several lines.
+# Each line is carried out atomically (this is also true for command line mode), so if there are several commands on a
+# single line, separated with semicolon, they will be performed atomically (an atomic set of statements). The exception
+# is when an empty statement is put in the line (just a semicolon), like in the script example, this will work as a line
+# break, and thus separate atomic sets of statements.  A typical use for atomic set of statements is to change filter
+# coefficients and volume at the same time.  The sleep function in the CLI allows for sleeping in seconds, milliseconds
+# or blocks. One block is exactly the filter length in samples, and if partitioned, it is the length of the partition.
+# Block sleep can only be used in script mode.  When in script mode, the first atomic statements will be executed just
+# before the first block is processed, then the block is processed (and sent to the output), and then the next set of
+# atomic statements is run. That is, each set of atomic statements is performed before the corresponding block is
+# processed. The next atomic statement set is not performed until the next block is about to be processed.  The block
+# sleep command (only works in script mode) works such that the sleep is commenced at the next block. The statement
+# sleep b1; will thus cause the next block to be skipped. Note that since one block passes for each atomic statement
+# set, a single line with only sleep b1; will skip two blocks, not one, since one block is consumed when parsing the
+# sleep command, and the other is skipped by the sleep duration. That is to skip only one block, either use sleep b0;
+# alone, or use sleep b1 as the last statement together with other statements in an atomic statement set (recommended).
+# Sleep in seconds and milliseconds will start the timer when the command is issued (at the start of the block if in a
+# script), and continue with the next command after at least the given time has passed. If run in a script, the timer is
+# polled at the start of each block, and the next command is then executed at the start of the first block where the
+# timer has expired.  If several sleep commands are executed in the same atomic statement set in a script, only the last
+# will take effect, and will be executed only when all other commands in the set have been processed. To avoid
+# confusion, it is thus recommended to employ sleep commands either alone, or as the last in the atomic statement set.
+# If the field echo is set to true, the CLI commands will be echoed back to the user (the whole line at a time). This is
+# off per default.  When connected and you type "help" at the prompt, you will get the following output:
+
+# Commands:
+	# lf -- list filters.
+	# lc -- list coefficient sets.
+	# li -- list inputs.
+	# lo -- list outputs.
+	# lm -- list modules.
+	# cfoa -- change filter output attenuation.
+	#         cfoa <filter> <output> <attenuation|Mmultiplier>
+	# cfia -- change filter input attenuation.
+	#         cfia <filter> <input> <attenuation|Mmultiplier>
+	# cffa -- change filter filter-input attenuation.
+	#         cffa <filter> <filter-input> <attenuation|Mmultiplier>
+	# cfc  -- change filter coefficients.
+	#         cfc <filter> <coeff>
+	# cfd  -- change filter delay. (may truncate coeffs!)
+	#         cfd <filter> <delay blocks>
+	# cod  -- change output delay.
+	#         cod <output> <delay> [<subdelay>]
+	# cid  -- change input delay.
+	#         cid <input> <delay> [<subdelay>]
+	# tmo  -- toggle mute output.
+	#         tmo <output>
+	# tmi  -- toggle mute input.
+	#         tmi <input>
+	# imc  -- issue input module command.
+	#         imc <index> <command>
+	# omc  -- issue output module command.
+	#         omc <index> <command>
+	# lmc  -- issue logic module command.
+	#         lmc <module> <command>
+	# sleep -- sleep for the given number of seconds [and ms], or blocks.
+	#          sleep 10 (sleep 10 seconds).
+	# 	 sleep b10 (sleep 10 blocks).
+	# 	 sleep 0 300 (sleep 300 milliseconds).
+	# abort -- terminate immediately.
+	# tp    -- toggle prompt.
+	# ppk   -- print peak info, channels/samples/max dB.
+	# rpk   -- reset peak meters.
+	# upk   -- toggle print peak info on changes.
+	# rti   -- print current realtime index.
+	# quit  -- close connection.
+	# help  -- print this text.
+
+# Notes:
+	# - When entering several commands on a single line,
+	#   separate them with semicolons (;).
+	# - Inputs/outputs/filters can be given as index
+	#   numbers or as strings between quotes ("").
+
+# Most commands are simple and don't need to be further explained. Naturally, any changes will lag behind as long as the
+# I/O delay is. The exception is the mute and change delay commands, they will lag behind as long as the period size of
+# the sound card is, which most often is smaller than the program's total I/O delay. However, when there is a virtual
+# channel mapping, the mute and delay will be lagged as well.  The imc, omc and lmc commands are used to give commands
+# to I/O modules and logic modules in run-time. To find out which modules that are loaded and which indexes they have,
+# use the command lm. Not all modules support run-time commands though.  Changing attenuations with cffa, cfia and cfoa
+# can be done with dB numbers or simply by giving a multiplier, which then is prefixed with m, like this cfoa 0 0 m-0.5.
+# Changing the attenuation with dB will not change the sign of the current multiplier.
+
+# Run-time equalizer
+####################
+
+# The equalizer logic module takes control over one or more coefficient sets, and renders equalizer filters to them, as
+# specified by the user. This can be done in the initial configuration, and also updated in runtime, through the CLI.
+# The startup configuration can look like this:
+	#   "eq"  {
+	# 		debug_dump_filter: "/tmp/rendered-%d";
+	# 		{
+	# 			coeff: 0, 1;
+	# 			#bands: "ISO octave";
+	# 			#bands: "ISO 1/3 octave";
+	# 			bands: 100, 200, 500;
+	# 			magnitude: 20/-3.2, 100/8.5;
+	# 			phase: 20/0, 100/180;
+	# 		};
+	# 		{
+	# 			coeff: "eq-1";
+	# 			bands: "ISO octave";
+	# 			magnitude: 31.5/-3.2, 125/8.5;
+	# 			phase: 31.5/3.2;
+	# 		};
+	# 	};
+
+# If you want to analyze the rendered filters, the debug_dump_filter setting specifies a file name where the rendered 
+# coefficients will be written. It must contain %d, which will be replaced by the coefficient index. 
+# Then follows equalizers. Each specify which coefficient index (or name) it should render the equalizer filter to. 
+# These must be allocated and must be stored in shared memory, for example like this:
+	# coeff 0 {
+	#   filename: "dirac pulse";
+	# 	shared_mem: true;
+	# 	blocks: 4;
+	# };
+	
+# The dirac pulse will be replaced by the rendered filter. Each equalizer has a set of frequency
+# bands (max 128), they can be manually specified, or use the ISO octave band presets. Optionally, magnitude (in dB) and
+# phase (in degrees) settings can be specified. The frequency value must then match one of the given bands.  If you
+# specify two filters, the rendering will be double-buffered, meaning that the eq module will keep one coefficient
+# active in the filter(s), and render to the other, and switch when ready. This means that there is no risk of playing
+# an incomplete equalizer, which can cause some noise (usually in the form of a beep), thus it is recommended to use
+# double-buffered mode if the equalizer will be altered in runtime. In the filter configuration and when referring to
+# the equalizer in the CLI, the first of the two coefficients should then be used.  In run-time, equalizers can be
+# modified through the CLI. An example: lmc eq 0 mag 20/-10, 4000/10 will set the magnitude to -10 dB at 20 Hz and +10
+# dB at 4000 Hz for equalizer for coefficient 0. Instead of mag, phase can be given. The command lmc eq "eq-1" info will
+# list the current settings for the equalizer stored in the coefficient called "eq-1".  The more heavily loaded the
+# computer is by convolution, the longer time it will take to render the new equalizer. If the coefficient set it
+# renders to is very short, and the magnitude and phase response is very detailed (sharp edges etc) it will not be able
+# to adapt to it fully. 
