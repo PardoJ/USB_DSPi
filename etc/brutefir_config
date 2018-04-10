@@ -1,23 +1,43 @@
-float_bits: 32;             
-filter_length: 4096,16;       # length of filters
+###########
+# GENERAL #
+###########
+float_bits: 64;             
 sampling_rate: 96000;
+filter_length: 8192,8;
+# config_file: "/home/shairport-sync/.brutefir_config"; 
 overflow_warnings: true;
-show_progress: false;       
+show_progress: false;    
+monitor_rate: false;       
 max_dither_table_size: 0;   
 allow_poll_mode: false;
-modules_path: ".";          # extra path where to find BruteFIR modules
-monitor_rate: true;        # monitor sample rate
-powersave: true;            # pause filtering when input is zero
-lock_memory: false;          # try to lock memory if realtime prio is set
-sdf_length: -1;             # subsample filter half length in samples
-safety_limit: 8.0;             # if non-zero max dB in output before aborting
-convolver_config: "/home/pi/.brutefir_convolver"; # location of convolver config file
-# config_file: "/home/shairport-sync/.brutefir_config"; # standard location of main config file
+modules_path: ".";         
+powersave: true;            
+lock_memory: true;        
+sdf_length: -1; 
+convolver_config: "/home/pi/.brutefir_convolver";
+benchmark: false;	   
+safety_limit: 8.0;
 
+##########
+# ADDONS #
+##########
+logic: "cli" { port: 3000; },
+  "eq"  {
+    {
+      coeff: "equalizer";
+      #bands: "ISO octave";
+      bands: 31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000;
+      magnitude:  31/0.0, 63/0.0, 125/0.0, 250/0.0, 500/0.0, 1000/0.0, 2000/0.0, 4000/0.0, 8000/0.0, 16000/0.0;
+    };
+}; 
 
+#########
+# COEFS #
+#########
 coeff "left_convolver" {
     filename: "/home/pi/speaker.raw";
     format: "S24_LE";
+    attenuation: 0.0; 
     blocks: -1;
     skip: 0;
     shared_mem: false;
@@ -26,6 +46,7 @@ coeff "left_convolver" {
 coeff "right_convolver" {
     filename: "/home/pi/speaker.raw";
     format: "S24_LE";
+    attenuation: 0.0; 
     blocks: -1;
     skip: 0;
     shared_mem: false;
@@ -34,69 +55,112 @@ coeff "right_convolver" {
 coeff "room_convolver" {
     filename: "/home/pi/room.raw";
     format: "S24_LE";
+    attenuation: 0.0; 
     blocks: -1;
     skip: 0;
     shared_mem: false;
 };
 
+coeff "equalizer" {
+    filename: "dirac pulse";
+    shared_mem: true;
+    blocks: 4;
+};
+
+##########
+# INPUTS #
+##########
 input "left_in", "right_in" {
     device: "alsa" { device: "hw:0,1"; ignore_xrun: true; };
     sample: "S32_LE";
     channels: 2/0,1;
     delay: 0,0;
+    # subdelay: 0,0;
     maxdelay: -1;
+    # individual_maxdelay: 0,0;
     mute: false, false;
+    # mapping: 0,1;
 };
 
-
-# Likewise, configure where BruteFIR sends its output
+###########
+# OUTPUTS #
+###########
 output "left_out", "right_out" {
     device: "alsa" { device: "hw:1,0"; ignore_xrun: true; };
     sample: "S24_LE";
     channels: 2/0,1;
-    delay: 0,0;
+    delay: 0,39;
+    # subdelay: 0,0;
     maxdelay: -1;
-    subdelay: 0,0;
+    # individual_maxdelay: 0,0;
     mute: false, false;
-    dither: false;
+    # mapping: 0,1;
+    dither: true;
+    merge: false;
 };
 
-
-filter "drc_l" {
+################
+# LEFT FILTERS #
+################
+filter "left_filter" {
     process: 1;
     from_inputs: "left_in";
-    to_filters: "drc_l2";
-    coeff: "left_convolver";
+    #coeff: "left_convolver";
+    coeff: -1;
+    to_filters: "room_filter_left";
     crossfade: false;
     delay: 0;
 };
 
-filter "drc_r" {
-    process: 0;
-    from_inputs: "right_in";
-    to_filters: "drc_r2";
-    coeff: "right_convolver";
+filter "room_filter_left" {
+    process: 2;
+    from_filters: "left_filter";
+    #coeff: "room_convolver";
+    coeff: -1;
+    to_filters: "equalizer_filter_left";
     crossfade: false;
     delay: 0;
 };
 
-filter "drc_l2" {
-    process: 1;
-    from_filters: "drc_l";
+filter "equalizer_filter_left" {
+    process: 2;
+    from_filters: "room_filter_left";
+    #coeff: "equalizer";
+    coeff: -1;
     to_outputs: "left_out";
     crossfade: false;
-    #coeff: "room_convolver";
-    coeff: -1;
     delay: 0;
 };
 
-filter "drc_r2" {
-    process: 0;
-    from_filters: "drc_r";
+#################
+# RIGHT FILTERS #
+#################
+filter "right_filter" {
+    process: 1;
+    from_inputs: "right_in";
+    #coeff: "right_convolver";
+    coeff: -1;
+    to_filters: "room_filter_right";
+    crossfade: false;
+    delay: 0;
+};
+
+filter "room_filter_right" {
+    process: 2;
+    from_filters: "right_filter";
+    #coeff: "room_convolver";
+    coeff: -1;
+    to_filters: "equalizer_filter_right";
+    crossfade: false;
+    delay: 0;
+};
+
+filter "equalizer_filter_right" {
+    process: 2;
+    from_filters: "room_filter_right";
+    #coeff: "equalizer";
+    coeff: -1;
     to_outputs: "right_out";
     crossfade: false;
-    #coeff: "room_convolver";
-    coeff: -1;
     delay: 0;
 };
-
