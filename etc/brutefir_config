@@ -3,7 +3,8 @@
 ###########
 float_bits: 64;             
 sampling_rate: 96000;
-filter_length: 8192,8;
+#filter_length: 4096,16 ;
+filter_length: 16384,4;
 # config_file: "/home/shairport-sync/.brutefir_config"; 
 overflow_warnings: true;
 show_progress: false;    
@@ -14,7 +15,7 @@ modules_path: ".";
 powersave: true;            
 lock_memory: true;        
 sdf_length: -1; 
-convolver_config: "/home/pi/.brutefir_convolver";
+convolver_config: "/home/osmc/.brutefir_convolver";
 benchmark: false;	   
 safety_limit: 8.0;
 
@@ -35,7 +36,7 @@ logic: "cli" { port: 3000; },
 # COEFS #
 #########
 coeff "left_convolver" {
-    filename: "/home/pi/speaker.raw";
+    filename: "/home/osmc/speakerL.raw";
     format: "S24_LE";
     attenuation: 0.0; 
     blocks: -1;
@@ -44,7 +45,7 @@ coeff "left_convolver" {
 };
 
 coeff "right_convolver" {
-    filename: "/home/pi/speaker.raw";
+    filename: "/home/osmc/speakerR.raw";
     format: "S24_LE";
     attenuation: 0.0; 
     blocks: -1;
@@ -53,7 +54,7 @@ coeff "right_convolver" {
 };
 
 coeff "room_convolver" {
-    filename: "/home/pi/room.raw";
+    filename: "/home/osmc/room3.raw";
     format: "S24_LE";
     attenuation: 0.0; 
     blocks: -1;
@@ -89,7 +90,7 @@ output "left_out", "right_out" {
     device: "alsa" { device: "hw:1,0"; ignore_xrun: true; };
     sample: "S24_LE";
     channels: 2/0,1;
-    delay: 0,39;
+    delay: 0,0;
     # subdelay: 0,0;
     maxdelay: -1;
     # individual_maxdelay: 0,0;
@@ -103,30 +104,30 @@ output "left_out", "right_out" {
 # LEFT FILTERS #
 ################
 filter "left_filter" {
-    process: 1;
+    process: -1;
     from_inputs: "left_in";
-    #coeff: "left_convolver";
-    coeff: -1;
+    coeff: "left_convolver";
+    #coeff: -1;
     to_filters: "room_filter_left";
     crossfade: false;
     delay: 0;
 };
 
 filter "room_filter_left" {
-    process: 2;
+    process: -1;
     from_filters: "left_filter";
-    #coeff: "room_convolver";
-    coeff: -1;
+    coeff: "room_convolver";
+    #coeff: -1;
     to_filters: "equalizer_filter_left";
     crossfade: false;
     delay: 0;
 };
 
 filter "equalizer_filter_left" {
-    process: 2;
+    process: -1;
     from_filters: "room_filter_left";
-    #coeff: "equalizer";
-    coeff: -1;
+    coeff: "equalizer";
+    #coeff: -1;
     to_outputs: "left_out";
     crossfade: false;
     delay: 0;
@@ -136,31 +137,32 @@ filter "equalizer_filter_left" {
 # RIGHT FILTERS #
 #################
 filter "right_filter" {
-    process: 1;
+    process: -1;
     from_inputs: "right_in";
-    #coeff: "right_convolver";
-    coeff: -1;
+    coeff: "right_convolver";
+    #coeff: -1;
     to_filters: "room_filter_right";
     crossfade: false;
     delay: 0;
 };
 
 filter "room_filter_right" {
-    process: 2;
+    process: -1;
     from_filters: "right_filter";
-    #coeff: "room_convolver";
-    coeff: -1;
+    coeff: "room_convolver";
+    #coeff: -1;
     to_filters: "equalizer_filter_right";
     crossfade: false;
     delay: 0;
 };
 
 filter "equalizer_filter_right" {
-    process: 2;
+    process: -1;
     from_filters: "room_filter_right";
-    #coeff: "equalizer";
-    coeff: -1;
+    coeff: "equalizer";
+    #coeff: -1;
     to_outputs: "right_out";
     crossfade: false;
     delay: 0;
 };
+
